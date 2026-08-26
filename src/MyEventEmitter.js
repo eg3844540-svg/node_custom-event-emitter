@@ -18,8 +18,10 @@ class MyEventEmitter {
   once(event, listener) {
     const wrapper = (...args) => {
       this.off(event, wrapper);
-      listener(...args);
+      listener.apply(this, args);
     };
+
+    wrapper.originalListener = listener;
 
     return this.on(event, wrapper);
   }
@@ -29,20 +31,36 @@ class MyEventEmitter {
       return this;
     }
 
-    this.events[event] = this.events[event].filter(
-      (currentListener) => currentListener !== listener,
-    );
+    const listeners = this.events[event];
+
+    for (let i = listeners.length - 1; i >= 0; i--) {
+      const currentListener = listeners[i];
+
+      if (
+        currentListener === listener ||
+        currentListener.originalListener === listener
+      ) {
+        listeners.splice(i, 1);
+        break;
+      }
+    }
+
+    if (listeners.length === 0) {
+      delete this.events[event];
+    }
 
     return this;
   }
 
   emit(event, ...args) {
-    if (!this.events[event]) {
+    const listeners = this.events[event];
+
+    if (!listeners || listeners.length === 0) {
       return false;
     }
 
-    this.events[event].slice().forEach((listener) => {
-      listener(...args);
+    listeners.slice().forEach((listener) => {
+      listener.apply(this, args);
     });
 
     return true;
@@ -61,8 +79,10 @@ class MyEventEmitter {
   prependOnceListener(event, listener) {
     const wrapper = (...args) => {
       this.off(event, wrapper);
-      listener(...args);
+      listener.apply(this, args);
     };
+
+    wrapper.originalListener = listener;
 
     return this.prependListener(event, wrapper);
   }
